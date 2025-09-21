@@ -94,44 +94,11 @@ If no file is found, it uses safe default settings.
 
 ### Configuration Options
 
-  -----------------------------------------------------------------------
-  Option                            Type             Description
-  --------------------------------- ---------------- --------------------
-  `output_dir`                      string           The directory where
-                                                     the processed output
-                                                     file will be saved.
-                                                     This path is created
-                                                     relative to the
-                                                     location where you
-                                                     run the script (the
-                                                     current working
-                                                     directory). Default:
-                                                     `"build"`
-
-  `minify_style`                    string           The minification
-                                                     strategy to use.
-                                                     `<br>`{=html} -
-                                                     `"none"`: Strips
-                                                     comments/blanks.
-                                                     `<br>`{=html} -
-                                                     `"multiline"`:
-                                                     Minifies and wraps
-                                                     lines.
-                                                     `<br>`{=html} -
-                                                     `"single_line"`:
-                                                     Minifies to one
-                                                     line. `<br>`{=html}
-                                                     Default: `"none"`
-
-  `multiline_max_chars`             integer          The maximum number
-                                                     of characters per
-                                                     line when using the
-                                                     `"multiline"` style.
-                                                     This option is
-                                                     ignored for other
-                                                     styles. Default:
-                                                     `120`
-  -----------------------------------------------------------------------
+| Option | Type | Description |
+|---|---:|---|
+| `output_dir` | string | Directory where the processed output file will be saved (relative to the location where you run the script). Default: `build`. |
+| `minify_style` | string | Minification strategy: `none` — strips comments and blank lines; `multiline` — minifies and wraps lines at `multiline_max_chars`; `single_line` — minifies all code into a single line and correctly handles preprocessor directives. Default: `none`. |
+| `multiline_max_chars` | integer | Maximum number of characters per line when using the `multiline` style. Ignored for other styles. Default: `120`. |
 
 ## Example Workflow
 
@@ -202,4 +169,4 @@ int main() {
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE).
