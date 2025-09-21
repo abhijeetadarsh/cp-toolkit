@@ -1,0 +1,5 @@
+{
+  "output_dir": "build",
+  "minify_style": "multiline",
+  "multiline_max_chars": 120
+}
