@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Order Statistics Tree, dynamic data
  * O(n log n) pre-processing and O(log n) algorithm using balanced BST

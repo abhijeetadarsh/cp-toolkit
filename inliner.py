@@ -13,51 +13,75 @@ import stat
 def install_script():
     """Copies the script to the user's local bin directory."""
     try:
-        # Define the target directory and destination path
         target_dir = os.path.expanduser('~/.local/bin')
         dest_path = os.path.join(target_dir, 'inliner')
         
         print(f"Attempting to install the script to '{target_dir}'...")
-
-        # Create the target directory if it doesn't exist
         if not os.path.exists(target_dir):
             print(f"Creating directory: {target_dir}")
             os.makedirs(target_dir)
 
-        # Get the path of the current script
         script_path = os.path.abspath(sys.argv[0])
-        
-        # Copy the file to the destination
         shutil.copy2(script_path, dest_path)
         print(f"✅ Script copied to '{dest_path}'")
         
-        # Make the destination file executable for the user
         current_permissions = os.stat(dest_path).st_mode
         os.chmod(dest_path, current_permissions | stat.S_IXUSR)
         print("✅ Made the script executable.")
 
-        # Provide a helpful message about the user's PATH
         print("\n--- Important Next Step ---")
-        print("For the 'inliner' command to work from anywhere, you must ensure")
-        print(f"'{target_dir}' is in your shell's PATH environment variable.")
-        print("\nYou can check this by running: echo $PATH")
-        print("\nIf it's not there, add the following line to your shell's config file")
-        print("(e.g., ~/.bashrc, ~/.zshrc, or ~/.profile):")
+        print(f"For the 'inliner' command to work, ensure '{target_dir}' is in your shell's PATH.")
+        print("You can check this by running: echo $PATH")
+        print("If it's not there, add this line to your ~/.bashrc, ~/.zshrc, or ~/.profile:")
         print(f'\n    export PATH="{target_dir}:$PATH"\n')
-        print("You will need to restart your terminal or run 'source ~/.bashrc' for the changes to take effect.")
+        print("Restart your terminal or run 'source ~/.bashrc' for changes to take effect.")
         print("\nInstallation complete!")
 
     except Exception as e:
         print(f"❌ An error occurred during installation: {e}")
         sys.exit(1)
 
+# --- New Recursive Inlining Logic ---
+def recursively_inline(header_path, seen_files):
+    """
+    Recursively reads a header file and all its local #include directives,
+    returning a single string with all content flattened.
+    """
+    abs_header_path = os.path.abspath(header_path)
+
+    if abs_header_path in seen_files:
+        return "" 
+    seen_files.add(abs_header_path)
+
+    try:
+        with open(abs_header_path, 'r') as f:
+            content = f.read()
+    except FileNotFoundError:
+        print(f"    [WARNING] Header not found: '{header_path}'. Skipping.")
+        return ""
+
+    processed_lines = []
+    header_dir = os.path.dirname(abs_header_path)
+
+    for line in content.splitlines():
+        match = re.search(r'^\s*#include "([^"]+)"', line)
+        if match:
+            included_header_name = match.group(1)
+            next_header_path = os.path.join(header_dir, included_header_name)
+            
+            print(f"        -> Found and processing nested header: '{included_header_name}'")
+            inlined_content = recursively_inline(next_header_path, seen_files)
+            processed_lines.append(inlined_content)
+        else:
+            if line.strip() != '#pragma once':
+                processed_lines.append(line)
+            
+    return "\n".join(processed_lines)
+
 # --- Core Application Logic ---
 
 def load_config(config_path):
     """Loads the configuration from a given path or returns defaults."""
-    # ... (rest of the script is the same as before)
-    # ... I am including the full script for completeness
-    
     defaults = {
         "output_dir": "build",
         "minify_style": "none",
@@ -69,14 +93,12 @@ def load_config(config_path):
         try:
             with open(config_path, 'r') as f:
                 content = f.read()
-                if not content:
-                    return defaults
-                # Update defaults with user config
+                if not content: return defaults
                 user_config = json.loads(content)
                 defaults.update(user_config)
                 return defaults
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: Could not read or parse config file '{config_path}'. Error: {e}. Using defaults.")
+            print(f"Warning: Could not read config '{config_path}'. Error: {e}. Using defaults.")
             return defaults
     else:
         print("-> No config file found. Using default settings.")
@@ -85,21 +107,17 @@ def load_config(config_path):
 def find_config_path(config_arg):
     """Searches for the config file in a specific order."""
     if config_arg:
-        if os.path.exists(config_arg):
-            return config_arg
+        if os.path.exists(config_arg): return config_arg
         else:
             print(f"Warning: Specified config file '{config_arg}' not found.")
             return None
     
-    # Search paths
     local_path = 'inliner_config.json'
     global_dir = os.path.expanduser('~/.config/inliner')
     global_path = os.path.join(global_dir, 'config.json')
     
-    if os.path.exists(local_path):
-        return local_path
-    if os.path.exists(global_path):
-        return global_path
+    if os.path.exists(local_path): return local_path
+    if os.path.exists(global_path): return global_path
         
     return None
 
@@ -116,7 +134,7 @@ def minify_cpp_line(line):
     return minified
 
 def process_file(input_filepath, config):
-    """Reads a source file, inlines headers based on config."""
+    """Reads a source file and recursively inlines marked headers."""
     source_directory = os.path.dirname(os.path.abspath(input_filepath))
     output_dir = config.get("output_dir", "build")
     minify_style = config.get("minify_style", "none")
@@ -143,59 +161,43 @@ def process_file(input_filepath, config):
                     header_name = match.group(1)
                     header_path = os.path.join(source_directory, header_name)
                     
-                    print(f"    -> Inlining '{header_name}' with style: '{minify_style}'...")
-                    try:
-                        with open(header_path, 'r') as header_file:
-                            header_content = header_file.read()
-                            content_no_comments = strip_comments(header_content)
-                            
-                            directives = []
-                            code_lines = []
-                            
-                            for ln in content_no_comments.splitlines():
-                                stripped_ln = ln.strip()
-                                if not stripped_ln:
-                                    continue
-                                if stripped_ln.startswith('#'):
-                                    directives.append(stripped_ln)
+                    print(f"    -> Recursively inlining '{header_name}' with style: '{minify_style}'...")
+                    
+                    seen_files = set()
+                    flattened_content = recursively_inline(header_path, seen_files)
+                    
+                    content_no_comments = strip_comments(flattened_content)
+                    
+                    directives, code_lines = [], []
+                    for ln in content_no_comments.splitlines():
+                        stripped_ln = ln.strip()
+                        if not stripped_ln: continue
+                        if stripped_ln.startswith('#'): directives.append(stripped_ln)
+                        else: code_lines.append(stripped_ln)
+
+                    final_content = "\n".join(directives)
+                    
+                    if code_lines:
+                        if minify_style == "single_line":
+                            minified_code = [minify_cpp_line(ln) for ln in code_lines]
+                            final_content += "\n" + " ".join(minified_code)
+                        elif minify_style == "multiline":
+                            wrapped_code, current_line = "", ""
+                            minified_code = [minify_cpp_line(ln) for ln in code_lines]
+                            for part in minified_code:
+                                if not current_line: current_line = part
+                                elif len(current_line) + len(part) + 1 <= max_chars: current_line += " " + part
                                 else:
-                                    code_lines.append(stripped_ln)
-                            
-                            # Write directives first, each on a new line
-                            final_content = "\n".join(directives)
-                            
-                            # Process and append code based on minify style
-                            if code_lines:
-                                if minify_style == "single_line":
-                                    minified_code = [minify_cpp_line(ln) for ln in code_lines]
-                                    final_content += "\n" + " ".join(minified_code)
-                                
-                                elif minify_style == "multiline":
-                                    wrapped_code = ""
-                                    current_line = ""
-                                    minified_code = [minify_cpp_line(ln) for ln in code_lines]
-                                    for part in minified_code:
-                                        if not current_line:
-                                            current_line = part
-                                        elif len(current_line) + len(part) + 1 <= max_chars:
-                                            current_line += " " + part
-                                        else:
-                                            wrapped_code += current_line + "\n"
-                                            current_line = part
-                                    if current_line:
-                                        wrapped_code += current_line
-                                    final_content += "\n" + wrapped_code
+                                    wrapped_code += current_line + "\n"
+                                    current_line = part
+                            if current_line: wrapped_code += current_line
+                            final_content += "\n" + wrapped_code
+                        else:
+                            final_content += "\n" + "\n".join(code_lines)
 
-                                else: # 'none' style
-                                    final_content += "\n" + "\n".join(code_lines)
-
-                            outfile.write(f"// --- Start of inlined file: {header_name} ---\n")
-                            outfile.write(final_content.strip() + "\n")
-                            outfile.write(f"// --- End of inlined file: {header_name} ---\n")
-
-                    except FileNotFoundError:
-                        print(f"    [WARNING] Header not found: '{header_path}'. Keeping original line.")
-                        outfile.write(line)
+                    outfile.write(f"// --- Start of inlined file: {header_name} ---\n")
+                    outfile.write(final_content.strip() + "\n")
+                    outfile.write(f"// --- End of inlined file: {header_name} ---\n")
                 else:
                     outfile.write(line)
 
@@ -214,21 +216,9 @@ if __name__ == "__main__":
         description="A C++ header inliner and minifier.",
         epilog="Example: python inliner.py main.cpp -c project_config.json"
     )
-    parser.add_argument(
-        'input_file', 
-        nargs='?', 
-        default=None, 
-        help='The C++ source file to process.'
-    )
-    parser.add_argument(
-        '-c', '--config', 
-        help='Path to a JSON configuration file.'
-    )
-    parser.add_argument(
-        '--install', 
-        action='store_true', 
-        help='Install the script to ~/.local/bin for easy access.'
-    )
+    parser.add_argument('input_file', nargs='?', default=None, help='The C++ source file to process.')
+    parser.add_argument('-c', '--config', help='Path to a JSON configuration file.')
+    parser.add_argument('--install', action='store_true', help='Install the script to ~/.local/bin for easy access.')
     
     args = parser.parse_args()
 

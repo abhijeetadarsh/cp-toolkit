@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Union-Find Disjoint Sets
  * UFDS Operation: O(1) findSet(i)

@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Segment Tree
  * Segment Tree Operation: O(n) build from an Array A
