@@ -1,0 +1,51 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "B 🛠️",
+            "command": "g++ -Wall -DAA --std=c++20 '${file}'",
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Builds the active C++ file using g++."
+        },
+        {
+            "type": "shell",
+            "label": "BR 🛠️ + 🚀",
+            "command": "g++ -Wall -DAA --std=c++20 '${file}' && ./a.out",
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Compiles and then runs the active C++ file."
+        },
+        {
+            "type": "process",
+            "label": "R 🚀",
+            "command": "./a.out",
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "group": "build",
+            "detail": "Runs the a.out in the file dir."
+        },
+        {
+            "type": "shell",
+            "label": "I 💥╾━╤デ╦︻ (•_- )",
+            "command": "inliner ${file}",
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "group": "build",
+            "detail": "Runs inliner on the active C++ file."
+        }
+    ]
+}
